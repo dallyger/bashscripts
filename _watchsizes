@@ -1,0 +1,2 @@
+#!/bin/bash
+watch -n ,2 -x ls -lisa --group-directories-first "$@"
