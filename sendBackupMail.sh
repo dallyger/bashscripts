@@ -11,8 +11,8 @@ fi
 
 # Getting the Body for this e-mail
 if [ -p /dev/stdin ]; then
-        echo "Message-body was piped to this script!"
-        MESSAGE="$( cat )"
+		echo "Message-body was piped to this script!"
+		MESSAGE="$( cat )"
 fi
 
 sendemail -f "EMAIL_FROM" \
