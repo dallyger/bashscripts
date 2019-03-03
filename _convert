@@ -1,0 +1,40 @@
+#!/bin/bash
+HELP="usage: _convert FILE TITLE [PATH]
+	FILE  - Path to the current file
+	TITLE - Title of this video. will be used as filename too
+	PATH  - (optional) Path to the Folder for the new file
+		if not given, the current workingdirectory will be used"
+
+#print help, if requestet
+if [ "${1}" = "--help" ] || [ "${1}" = "-h" ]; then
+	echo "compressing video-files by converting them"
+	echo "$HELP"
+	exit
+fi
+
+#check if all needed parameters are given
+if [ $# -lt 2 ]; then
+	echo "not all required parameters are given!"
+	echo "$HELP"
+	exit
+fi
+
+#set the directory to export to
+if [ $# -eq 3 ]; then
+	NEWPATH="${3}"
+	#strip last '/'-char (manually added later)
+	if [ ${NEWPATH: -1} = "/" ]; then
+		NEWPATH="${NEWPATH::-1}"
+	fi
+else
+	#fall-back to current directory
+	NEWPATH="."
+fi
+
+#generating filename from title
+TITLE=${2}
+FILENAME=${TITLE// /_}
+FILENAME=${FILENAME,,}
+
+#converting the file
+ffmpeg -hwaccel auto -hide_banner -i "${1}" -map 0 -codec copy -codec:v h264 -codec:a ac3 -metadata title="$TITLE" "$NEWPATH/$FILENAME.mkv"
