@@ -1,0 +1,16 @@
+#!/bin/bash
+HELP="usage: _create-qcow2 filename size
+like:  _create-qcow2 foo 256G"
+if [ ${1} "--help" ] || [ ${1} == "-h" ]; then
+	echo "Shortcut for creating empty, small .qcow2 files, that grows when needed."
+	echo "$HELP"
+	exit
+fi
+
+if [ -z ${1} ] || [ -z ${2} ]; then
+	echo "not all required parameters are given!"
+	echo "$HELP"
+	exit
+fi
+
+qemu-img create -f qcow2 ${1}.qcow2 ${2}
