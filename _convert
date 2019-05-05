@@ -5,7 +5,7 @@ HELP="usage: _convert FILE TITLE [PATH]
 	PATH  - (optional) Path to the Folder for the new file
 		if not given, the current workingdirectory will be used"
 
-#print help, if requestet
+#print help, if requested
 if [ "${1}" = "--help" ] || [ "${1}" = "-h" ]; then
 	echo "compressing video-files by converting them"
 	echo "$HELP"
