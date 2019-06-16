@@ -8,6 +8,7 @@ if [ -w "$FILE" ] || ( [ ! -f "$FILE" ] && [ -w "/bin" ] ); then
 	ln --symbolic -T $SCRIPTDIR/_watchls _watchls
 	ln --symbolic -T $SCRIPTDIR/_convert _convert
 	ln --symbolic -T $SCRIPTDIR/_create-qcow2 _create-qcow2
+	ln --symbolic -T $SCRIPTDIR/_yt2audio _yt2audio
 elif [ $UID -ne 0 ]; then
 	#restart and ask for sudo rigths
 	exec sudo $0 $@

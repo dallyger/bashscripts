@@ -1,0 +1,14 @@
+#!/bin/bash
+HELP="usage: _yt2audio URL"
+if [ ${1} "--help" ] || [ ${1} == "-h" ]; then
+	echo "Shortcut to download and extract audio from youtube."
+	echo "$HELP"
+	exit
+fi
+
+if [ -z ${1} ] ; then
+	echo "not all required parameters are given!"
+	echo "$HELP"
+	exit
+fi
+youtube-dl --output "%(title)s.%(ext)s" --restrict-filenames --extract-audio "${1}"
