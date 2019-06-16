@@ -14,7 +14,7 @@ getHttpPart () {
 	printf "<VirtualHost *:80>
 	ServerName $DOMAIN
 	ServerAdmin $ADMIN
-
+	$1
 	ErrorLog \${APACHE_LOG_DIR}/error.log
 	CustomLog \${APACHE_LOG_DIR}/access.log combined
 </VirtualHost>\n"
@@ -35,13 +35,28 @@ getHttpsPart () {
 
 		ErrorLog \${APACHE_LOG_DIR}/error.log
 		CustomLog \${APACHE_LOG_DIR}/access.log combined
-
+		$1
 		SSLEngine on
 		SSLCertificateFile /etc/ssl/certs/ssl-cert-snakeoil.pem
 		SSLCertificateKeyFile /etc/ssl/private/ssl-cert-snakeoil.key
 	</VirtualHost>
-</IfModule>
-"
+</IfModule>\n"
+}
+
+getProxyPart () {
+	printf "\n\t\tSSLProxyEngine On
+		ProxyPass \"/\"  \"https://$PROXYURL/\"
+		ProxyPassReverse \"/\"  \"https://$PROXYURL/\""
+}
+
+getProxyPartInsecure () {
+	printf "\n\t\tSSLProxyEngine On
+		SSLProxyVerify none
+		SSLProxyCheckPeerCN off
+		SSLProxyCheckPeerName off
+		SSLProxyCheckPeerExpire off
+		ProxyPass \"/\"  \"https://$PROXYURL/\"
+		ProxyPassReverse \"/\"  \"https://$PROXYURL/\""
 }
 
 if [ -w "$FILE" ] || ( [ ! -f "$FILE" ] && [ -w "/bin" ] ); then
@@ -68,8 +83,8 @@ if [ -w "$FILE" ] || ( [ ! -f "$FILE" ] && [ -w "/bin" ] ); then
 	fi
 
 	#install http and / or https
-	select yn in "HTTP only" "HTTPS only" "both" "forward HTTP to HTTPS" "Exit"; do
-	    case $yn in
+	select type in "HTTP only" "HTTPS only" "both" "forward HTTP to HTTPS" "Proxy" "Exit"; do
+	    case $type in
 	        "HTTP only" )
 				VHOSTFILE=$(getHttpPart)
 				break;;
@@ -81,6 +96,37 @@ if [ -w "$FILE" ] || ( [ ! -f "$FILE" ] && [ -w "/bin" ] ); then
 				break;;
 			"forward HTTP to HTTPS" )
 				VHOSTFILE=$(getHttpRedirectPart)$(getHttpsPart)
+				break;;
+			"Proxy" )
+				read -p "Proxy-URL: " PROXYURL
+				#ignore ssl-errors if wanted
+				while true; do
+					read -p "ignore ssl-warnings from $PROXYURL? [yes/no] " yn
+				    case $yn in
+				        [Nn]* ) PROXYPART=$(getProxyPart); break;;
+						[Yy]* ) PROXYPART=$(getProxyPartInsecure); break;;
+				        * ) echo "Please answer yes or no.";;
+				    esac
+				done
+				select proxy in "HTTP only" "HTTPS only" "both" "forward HTTP to HTTPS" "Exit"; do
+					case $proxy in
+						"HTTP only" )
+							VHOSTFILE=$(getHttpPart "$PROXYPART")
+							break;;
+				        "HTTPS only" )
+							VHOSTFILE=$(getHttpsPart "$PROXYPART")
+							break;;
+						"both" )
+							VHOSTFILE=$(getHttpPart "$PROXYPART")$(getHttpsPart "$PROXYPART")
+							break;;
+						"forward HTTP to HTTPS" )
+							VHOSTFILE=$(getHttpRedirectPart)$(getHttpsPart "$PROXYPART")
+							break;;
+						"Exit" )
+							exit 0;
+							break;;
+					esac
+				done
 				break;;
 			"Exit" )
 				exit 0
