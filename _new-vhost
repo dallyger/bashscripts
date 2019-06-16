@@ -1,0 +1,136 @@
+#!/bin/bash
+HELP="Create a new virtual-host in apache
+usage: _new-vhost [ DOMAIN [ ADMIN-EMAIL ] ]
+examples:
+	_new-vhost
+	_new-vhost example.com
+	_new-vhost example.com admin@example.com"
+FILE="./test.txt"
+VHOSTFILE="empty vhost"
+DOMAIN="localhost"
+ADMIN="admin@localhost"
+
+getHttpPart () {
+	printf "<VirtualHost *:80>
+	ServerName $DOMAIN
+	ServerAdmin $ADMIN
+
+	ErrorLog \${APACHE_LOG_DIR}/error.log
+	CustomLog \${APACHE_LOG_DIR}/access.log combined
+</VirtualHost>\n"
+}
+
+getHttpRedirectPart () {
+	printf "<VirtualHost *:80>
+	ServerName $DOMAIN
+	Redirect permanent / https://$DOMAIN/
+</VirtualHost>\n"
+}
+
+getHttpsPart () {
+	printf "\n<IfModule mod_ssl.c>
+	<VirtualHost *:443>
+		ServerName $DOMAIN
+		ServerAdmin $ADMIN
+
+		ErrorLog \${APACHE_LOG_DIR}/error.log
+		CustomLog \${APACHE_LOG_DIR}/access.log combined
+
+		SSLEngine on
+		SSLCertificateFile /etc/ssl/certs/ssl-cert-snakeoil.pem
+		SSLCertificateKeyFile /etc/ssl/private/ssl-cert-snakeoil.key
+	</VirtualHost>
+</IfModule>
+"
+}
+
+if [ -w "$FILE" ] || ( [ ! -f "$FILE" ] && [ -w "/bin" ] ); then
+
+	#prompt for domain
+	if [ -z $1 ]
+	then
+		read -p "Enter the domain name for this vhost: " DOMAIN;
+	#echo help if first param is -h or --help
+	elif [ $1 = "-h" ] || [ $1 = "--help" ]
+		then
+			echo "$HELP"
+			exit 0
+	else
+		DOMAIN=$1;
+	fi
+
+	#prompt for domain-admin
+	if [ -z $2 ]
+		then
+			read -p "Enter the email-address of this domains admin: " ADMIN;
+	else
+		ADMIN=$2;
+	fi
+
+	#install http and / or https
+	select yn in "HTTP only" "HTTPS only" "both" "forward HTTP to HTTPS" "Exit"; do
+	    case $yn in
+	        "HTTP only" )
+				VHOSTFILE=$(getHttpPart)
+				break;;
+	        "HTTPS only" )
+				VHOSTFILE=$(getHttpsPart)
+				break;;
+			"both" )
+				VHOSTFILE=$(getHttpPart)$(getHttpsPart)
+				break;;
+			"forward HTTP to HTTPS" )
+				VHOSTFILE=$(getHttpRedirectPart)$(getHttpsPart)
+				break;;
+			"Exit" )
+				exit 0
+				break;;
+	    esac
+	done
+	printf "Preview:
+--------------------------------------------------------------------------------
+$VHOSTFILE
+--------------------------------------------------------------------------------\n"
+
+	#installing vhost
+	mkdir -p /etc/apache2/sites-available
+	CONFFILE="/etc/apache2/sites-available/$DOMAIN.conf"
+	while true; do
+		if [ -f $CONFFILE ]; then
+			read -p "Overwrite configuration? [yes/no] " yn
+		else
+			read -p "Install virtual host? [yes/no] " yn
+		fi
+	    case $yn in
+	        [Yy]* ) printf "$VHOSTFILE" > "$CONFFILE"; break;;
+	        [Nn]* ) exit 0;;
+	        * ) echo "Please answer yes or no.";;
+	    esac
+	done
+
+	#enable vhost if wanted
+	while true; do
+		read -p "enable virtual host? [yes/no] " yn
+	    case $yn in
+	        [Yy]* ) a2ensite $DOMAIN; break;;
+	        [Nn]* ) exit 0;;
+	        * ) echo "Please answer yes or no.";;
+	    esac
+	done
+
+	#restart apache if wanted
+	while true; do
+		read -p "enable virtual host? [yes/no] " yn
+	    case $yn in
+	        [Yy]* ) systemctl restart apache2.service; break;;
+	        [Nn]* ) exit 0;;
+	        * ) echo "Please answer yes or no.";;
+	    esac
+	done
+elif [ $UID -ne 0 ]; then
+	#restart and ask for sudo rigths
+	exec sudo $0 $@
+else
+	echo "Error: Can't create commands, even with root permissions..."
+	exit 1
+fi
