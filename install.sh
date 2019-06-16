@@ -2,13 +2,11 @@ FILE="./test.txt"
 if [ -w "$FILE" ] || ( [ ! -f "$FILE" ] && [ -w "/bin" ] ); then
 	SCRIPTDIR=$PWD
 	cd /bin
-	#create symbolic links for each command
-	ln --symbolic -T $SCRIPTDIR/_ls _ls
-	ln --symbolic -T $SCRIPTDIR/_edit _edit
-	ln --symbolic -T $SCRIPTDIR/_watchls _watchls
-	ln --symbolic -T $SCRIPTDIR/_convert _convert
-	ln --symbolic -T $SCRIPTDIR/_create-qcow2 _create-qcow2
-	ln --symbolic -T $SCRIPTDIR/_yt2audio _yt2audio
+	#create symbolic links for each command beginning with '_'
+	for entry in `ls $SCRIPTDIR/_*`; do
+		chmod a+x $entry
+		ln --symbolic -T $entry "${entry##*/}" >/dev/null 2>&1 && echo "added ${entry##*/}"
+	done
 elif [ $UID -ne 0 ]; then
 	#restart and ask for sudo rigths
 	exec sudo $0 $@
