@@ -1,19 +1,22 @@
 #!/bin/bash
 HELP="Create a new virtual-host in apache
-usage: _new-vhost [ DOMAIN [ ADMIN-EMAIL ] ]
+usage: _new-vhost [ DOMAIN [ ADMIN-EMAIL [ DOCUMENT-ROOT ] ] ]
 examples:
 	_new-vhost
 	_new-vhost example.com
-	_new-vhost example.com admin@example.com"
+	_new-vhost example.com admin@example.com
+	_new-vhost example.com admin@example.com /var/www/html"
 FILE="./test.txt"
 VHOSTFILE="empty vhost"
 DOMAIN="localhost"
 ADMIN="admin@localhost"
+DOCROOT="/var/www/html"
 
 getHttpPart () {
 	printf "<VirtualHost *:80>
 	ServerName $DOMAIN
 	ServerAdmin $ADMIN
+	DocumentRoot $DOCROOT
 	$1
 	ErrorLog \${APACHE_LOG_DIR}/error.log
 	CustomLog \${APACHE_LOG_DIR}/access.log combined
@@ -32,6 +35,7 @@ getHttpsPart () {
 	<VirtualHost *:443>
 		ServerName $DOMAIN
 		ServerAdmin $ADMIN
+		DocumentRoot $DOCROOT
 
 		ErrorLog \${APACHE_LOG_DIR}/error.log
 		CustomLog \${APACHE_LOG_DIR}/access.log combined
@@ -85,6 +89,15 @@ if [ -w "$FILE" ] || ( [ ! -f "$FILE" ] && [ -w "/bin" ] ); then
 	else
 		ADMIN=$2;
 	fi
+
+	#prompt for domain-admin
+	if [ -z $3 ]
+		then
+			read -p "Enter the root-directory: " DOCROOT;
+	else
+		DOCROOT=$3;
+	fi
+	#TODO gets printed, even if vhost is a  proxy
 
 	#install http and / or https
 	select type in "HTTP only" "HTTPS only" "both" "forward HTTP to HTTPS" "Proxy" "Exit"; do
