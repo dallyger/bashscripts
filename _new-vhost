@@ -43,20 +43,24 @@ getHttpsPart () {
 </IfModule>\n"
 }
 
-getProxyPart () {
+getProxyPartHttp () {
+	printf "\n\tProxyPass \"/\"  \"http://$PROXYURL/\"
+	ProxyPassReverse \"/\"  \"http://$PROXYURL/\"
+	$1"
+}
+
+getProxyPartHttps () {
 	printf "\n\t\tSSLProxyEngine On
 		ProxyPass \"/\"  \"https://$PROXYURL/\"
-		ProxyPassReverse \"/\"  \"https://$PROXYURL/\""
+		ProxyPassReverse \"/\"  \"https://$PROXYURL/\"
+		$1"
 }
 
 getProxyPartInsecure () {
-	printf "\n\t\tSSLProxyEngine On
-		SSLProxyVerify none
+	printf "\n\t\tSSLProxyVerify none
 		SSLProxyCheckPeerCN off
 		SSLProxyCheckPeerName off
-		SSLProxyCheckPeerExpire off
-		ProxyPass \"/\"  \"https://$PROXYURL/\"
-		ProxyPassReverse \"/\"  \"https://$PROXYURL/\""
+		SSLProxyCheckPeerExpire off"
 }
 
 if [ -w "$FILE" ] || ( [ ! -f "$FILE" ] && [ -w "/bin" ] ); then
@@ -103,24 +107,24 @@ if [ -w "$FILE" ] || ( [ ! -f "$FILE" ] && [ -w "/bin" ] ); then
 				while true; do
 					read -p "ignore ssl-warnings from $PROXYURL? [yes/no] " yn
 				    case $yn in
-				        [Nn]* ) PROXYPART=$(getProxyPart); break;;
-						[Yy]* ) PROXYPART=$(getProxyPartInsecure); break;;
+				        [Nn]* ) PROXYINSECPART=""; break;;
+						[Yy]* ) PROXYINSECPART=$(getProxyPartInsecure); break;;
 				        * ) echo "Please answer yes or no.";;
 				    esac
 				done
 				select proxy in "HTTP only" "HTTPS only" "both" "forward HTTP to HTTPS" "Exit"; do
 					case $proxy in
 						"HTTP only" )
-							VHOSTFILE=$(getHttpPart "$PROXYPART")
+							VHOSTFILE=$(getHttpPart "$(getProxyPartHttp)")
 							break;;
 				        "HTTPS only" )
-							VHOSTFILE=$(getHttpsPart "$PROXYPART")
+							VHOSTFILE=$(getHttpsPart "$(getProxyPartHttp "$PROXYINSECPART")")
 							break;;
 						"both" )
-							VHOSTFILE=$(getHttpPart "$PROXYPART")$(getHttpsPart "$PROXYPART")
+							VHOSTFILE=$(getHttpPart "$(getProxyPartHttp)")$(getHttpsPart "$(getProxyPartHttp "$PROXYINSECPART")")
 							break;;
 						"forward HTTP to HTTPS" )
-							VHOSTFILE=$(getHttpRedirectPart)$(getHttpsPart "$PROXYPART")
+							VHOSTFILE=$(getHttpRedirectPart)$(getHttpsPart "$(getProxyPartHttp "$PROXYINSECPART")")
 							break;;
 						"Exit" )
 							exit 0;
