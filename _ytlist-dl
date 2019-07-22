@@ -9,6 +9,6 @@ if [ "${1}" = "--help" ] || [ "${1}" = "-h" ]; then
 	exit
 fi
 
-~/.local/bin/youtube-dl -o "%(title)s.%(ext)s" --yes-playlist \
+~/.local/bin/youtube-dl -o "%(title)s.%(ext)s" --yes-playlist --ignore-errors\
 	--download-archive $HOMEDIR"ytbot-music.archive"  --quiet \
 	--no-part --no-progress --extract-audio ${1}
