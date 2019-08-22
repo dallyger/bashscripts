@@ -1,5 +1,6 @@
+#!/bin/bash
 SEPARATOR='--------------------------------------------------------------------------------'
-
+VHOSTS_CONFIG_LOCATION="/etc/apache2/sites-available"
 exitWithError () {
 	MSG=${1}
 	if [ -z "$1" ]
@@ -28,7 +29,8 @@ askUser () {
 }
 
 #-------------------------------------------------------------------------------
-# TODO check for write permissions
+TESTFILE="$VHOSTS_CONFIG_LOCATION/000-default.conf"
+[ -w $TESTFILE ] || exitWithError 'Need write permissions for vhosts!'
 
 #-------------------------------------------------------------------------------
 #ask user about the wanted configuration
@@ -54,7 +56,8 @@ then
 	read -p 'Document Root: ' DOC_ROOT
 fi
 
-select type in "HTTP only" "HTTPS only" "both" "forward HTTP to HTTPS"; do
+select type in "HTTP only" "HTTPS only" "both" "forward HTTP to HTTPS"
+do
 	case $type in
 		"HTTP only" )
 			USE_HTTP=1
@@ -73,7 +76,7 @@ select type in "HTTP only" "HTTPS only" "both" "forward HTTP to HTTPS"; do
 	esac
 done
 
-if [ ! -z "$USE_HTTP"] && [ "$USE_HTTP" == 1 ]
+if [ ! -z "$USE_HTTP" ] && [ "$USE_HTTP" == 1 ]
 then
 	read -p 'HTTP Port [80]: ' PORT_HTTP
 	if [ -z "$PORT_HTTP"]
@@ -82,7 +85,7 @@ then
 	fi
 fi
 
-if [ ! -z "$USE_HTTPS"] && [ "$USE_HTTPS" == 1 ]
+if [ ! -z "$USE_HTTPS" ] && [ "$USE_HTTPS" == 1 ]
 then
 	read -p 'HTTPS Port [443]: ' PORT_HTTPS
 	if [ -z "$PORT_HTTPS"]
@@ -110,12 +113,13 @@ arg1 () {
 	ENABLE_HTPASSWD=1
 }
 askUser 'Enable authentication via .htpasswd file?' arg1 break
-if [ -z "$ENABLE_HTPASSWD" ]
+if [ ! -z "$ENABLE_HTPASSWD" ]
 then
-	read -p 'Location of the .htpasswd file' HTPASSWD_FILE
+	read -p 'Location of the .htpasswd file: ' HTPASSWD_FILE
 fi
 
 #-------------------------------------------------------------------------------
 #generate vhost settings file
 
+#-------------------------------------------------------------------------------
 #install vhost
