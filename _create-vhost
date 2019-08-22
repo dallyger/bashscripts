@@ -1,0 +1,121 @@
+SEPARATOR='--------------------------------------------------------------------------------'
+
+exitWithError () {
+	MSG=${1}
+	if [ -z "$1" ]
+	then
+		MSG='more attributes needed!'
+	fi
+	printf "\n$SEPARATOR\n\t$MSG\n$SEPARATOR\n\n"
+	exit 1
+}
+
+# usage: askUser QUESTION ON_YES ON_NO
+askUser () {
+	if [ -z "$3" ]
+	then
+		exitWithError #require all arguments or exit with error
+	fi
+
+	while true; do
+		read -p "${1} [yes/no] " yn
+	    case $yn in
+	        [Yy]* ) ${2}; break;;
+	        [Nn]* ) ${3}; break;;
+	        * ) echo "Please answer yes or no.";;
+	    esac
+	done
+}
+
+#-------------------------------------------------------------------------------
+# TODO check for write permissions
+
+#-------------------------------------------------------------------------------
+#ask user about the wanted configuration
+arg1 () {
+	IS_PROXY=1
+}
+askUser "Is this a Proxy-VHost?" arg1 break
+
+if [ ! -z "$IS_PROXY" ] && [ "$IS_PROXY" -eq 1 ]
+then
+	arg1 () {
+		PROXY_IGNORE_SSL=1
+	}
+	askUser "Ignore SSL-Warnings from Proxied Server?" arg1 break
+fi
+
+read -p 'Domain Name: ' DOMAIN_NAME
+read -p 'Domain aliases (separated by semicolons; empty if none): ' DOMAIN_ALIASES
+read -p 'Administration Email: ' ADMIN_EMAIL
+
+if [ -z "$IS_PROXY" ] #only if not a proxy
+then
+	read -p 'Document Root: ' DOC_ROOT
+fi
+
+select type in "HTTP only" "HTTPS only" "both" "forward HTTP to HTTPS"; do
+	case $type in
+		"HTTP only" )
+			USE_HTTP=1
+			break;;
+		"HTTPS only" )
+			USE_HTTPS=1
+			break;;
+		"both" )
+			USE_HTTP=1
+			USE_HTTPS=1
+			break;;
+		"forward HTTP to HTTPS" )
+			USE_HTTP="forward"
+			USE_HTTPS=1
+			break;;
+	esac
+done
+
+if [ ! -z "$USE_HTTP"] && [ "$USE_HTTP" == 1 ]
+then
+	read -p 'HTTP Port [80]: ' PORT_HTTP
+	if [ -z "$PORT_HTTP"]
+	then
+		PORT_HTTP=80
+	fi
+fi
+
+if [ ! -z "$USE_HTTPS"] && [ "$USE_HTTPS" == 1 ]
+then
+	read -p 'HTTPS Port [443]: ' PORT_HTTPS
+	if [ -z "$PORT_HTTPS"]
+	then
+		PORT_HTTPS=443
+	fi
+fi
+
+arg1 () {
+	CUSTOM_SSL_CERTS=1
+}
+askUser 'Use custom SSL Certificates?' arg1 break
+if [ ! -z "$CUSTOM_SSL_CERTS" ]
+then
+	read -p 'Location of the public key: ' CUSTOM_SSL_CERTS_PUBLIC_KEY
+	read -p 'Location of the private key: ' CUSTOM_SSL_CERTS_PRIVATE_KEY
+	read -p 'Location of the ca cert (optional): ' CUSTOM_SSL_CERTS_CA
+fi
+
+arg1 () {
+	ENABLE_HTACCESS=1
+}
+askUser 'Enable .htaccess files?' arg1 break
+arg1 () {
+	ENABLE_HTPASSWD=1
+}
+askUser 'Enable authentication via .htpasswd file?' arg1 break
+if [ -z "$ENABLE_HTPASSWD" ]
+then
+	read -p 'Location of the .htpasswd file' HTPASSWD_FILE
+fi
+
+#-------------------------------------------------------------------------------
+#generate vhost settings file
+
+#install vhost
