@@ -1,0 +1,14 @@
+#!/bin/bash
+HELP="usage: _ytlist-dl URL"
+HOMEDIR="$HOME/.config/darlor/"
+mkdir -p $HOMEDIR
+#print help, if requestet
+if [ "${1}" = "--help" ] || [ "${1}" = "-h" ]; then
+	echo "downloading music-playlist from youtube"
+	echo "$HELP"
+	exit
+fi
+
+~/.local/bin/youtube-dl -o "%(title)s.%(ext)s" --yes-playlist --ignore-errors\
+	--download-archive $HOMEDIR"ytbot-music.archive"  --quiet \
+	--no-part --no-progress --extract-audio ${1}
