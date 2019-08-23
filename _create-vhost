@@ -41,6 +41,7 @@ askUser "Is this a Proxy-VHost?" arg1 break
 
 if [ ! -z "$IS_PROXY" ] && [ "$IS_PROXY" -eq 1 ]
 then
+	read -p "Remote Host: " PROXY_REMOTE_HOST
 	arg1 () {
 		PROXY_IGNORE_SSL=1
 	}
@@ -105,10 +106,13 @@ then
 	read -p 'Location of the ca cert (optional): ' CUSTOM_SSL_CERTS_CA
 fi
 
-arg1 () {
-	ENABLE_HTACCESS=1
-}
-askUser 'Enable .htaccess files?' arg1 break
+if [ -z "$IS_PROXY" ] #only usefull if not a proxy
+then
+	arg1 () {
+		ENABLE_HTACCESS=1
+	}
+	askUser 'Enable .htaccess files?' arg1 break
+fi
 arg1 () {
 	ENABLE_HTPASSWD=1
 }
@@ -120,6 +124,13 @@ fi
 
 #-------------------------------------------------------------------------------
 #generate vhost settings file
+getDocRootIfWanted () {
+	if [ -z "$IS_PROXY" ]
+	then
+		echo -e "\n${1}DocumentRoot $DOC_ROOT\n"
+	fi
+}
+
 getAliases () {
 	if [ ! -z "$DOMAIN_ALIASES" ]
 	then
@@ -128,7 +139,7 @@ getAliases () {
 		do
 			allAliases=$(echo -e "$allAliases ${alias//[[:space:]]/}")
 		done
-		echo -e "${1}ServerAlias$allAliases"
+		echo -e "\n${1}ServerAlias$allAliases\n"
 	fi
 }
 getCertConf () {
@@ -137,7 +148,7 @@ getCertConf () {
 		CUSTOM_SSL_CERTS_PUBLIC_KEY="/etc/ssl/certs/ssl-cert-snakeoil.pem"
 		CUSTOM_SSL_CERTS_PRIVATE_KEY="/etc/ssl/private/ssl-cert-snakeoil.key"
 	fi
-	echo -e "\n\t\tSSLEngine on\n" \
+	echo -e "\n\n\t\tSSLEngine on\n" \
  		"\t\tSSLCertificateFile $CUSTOM_SSL_CERTS_PUBLIC_KEY\n" \
 		"\t\tSSLCertificateKeyFile $CUSTOM_SSL_CERTS_PRIVATE_KEY\n"
 	if [ ! -z "$CUSTOM_SSL_CERTS_CA" ]
@@ -149,7 +160,7 @@ getCertConf () {
 enableHtaccessIfWanted () {
 	if [ ! -z "$ENABLE_HTACCESS" ]
 	then
-		echo -e "\n${1}<Directory $DOC_ROOT>\n" \
+		echo -e "\n\n${1}<Directory $DOC_ROOT>\n" \
 			"${1}\tOptions Indexes FollowSymLinks\n" \
 			"${1}\tAllowOverwrite All\n" \
 			"${1}\tRequire all granted\n" \
@@ -157,17 +168,44 @@ enableHtaccessIfWanted () {
 	fi
 }
 
+getHttpProxyConfigIfWanted () {
+	if [ ! -z "$IS_PROXY" ]
+	then
+		echo -e "\n\n${1}ProxyPreserveHost On\n" \
+			"${1}ProxyPass /  http://$PROXY_REMOTE_HOST/\n" \
+			"${1}ProxyPassReverse /  http://$PROXY_REMOTE_HOST/\n"
+	fi
+}
+
+getHttpsProxyConfigIfWanted () {
+	if [ ! -z "$IS_PROXY" ]
+	then
+		echo -e "\n\n${1}SSLProxyEngine On\n" \
+			"${1}ProxyPass /  https://$PROXY_REMOTE_HOST/\n" \
+			"${1}ProxyPassReverse /  https://$PROXY_REMOTE_HOST/"
+		if [ ! -z "$PROXY_IGNORE_SSL" ]
+		then
+			echo -e "${1}SSLProxyVerify none\n" \
+			"${1}SSLProxyCheckPeerName off\n" \
+			"${1}SSLProxyCheckPeerCN off\n" \
+			"${1}SSLProxyCheckPeerExpire off\n"
+		fi
+	fi
+}
+
 SETTINGS=""
+
 case "$USE_HTTP" in
 	1 )
 		SETTINGS=$(echo -e "$SETTINGS\n" \
 			"<VirtualHost *:$PORT_HTTP>\n" \
-			"\tServerName $DOMAIN_NAME\n" \
-			"$(getAliases "\t")\n" \
 			"\tServerAdmin $ADMIN_EMAIL\n" \
-			"\tDocumentRoot $DOC_ROOT\n" \
-			"$(enableHtaccessIfWanted "\t")\n" \
-			"\n\tErrorLog \${APACHE_LOG_DIR}/error.log\n" \
+			"\tServerName $DOMAIN_NAME" \
+			"$(getAliases "\t")" \
+			"$(getDocRootIfWanted "\t")" \
+			"$(getHttpProxyConfigIfWanted "\t")" \
+			"$(enableHtaccessIfWanted "\t")" \
+			"\n\n\tErrorLog \${APACHE_LOG_DIR}/error.log\n" \
 			"\tCustomLog \${APACHE_LOG_DIR}/access.log combined\n" \
 			"</VirtualHost>\n")
 		;;
@@ -175,7 +213,7 @@ case "$USE_HTTP" in
 			SETTINGS=$(echo -e "$SETTINGS\n" \
 			"<VirtualHost *:$PORT_HTTP>\n" \
 			"\tServerName $DOMAIN_NAME\n" \
-			"$(getAliases "\t")\n" \
+			"$(getAliases "\t")" \
 			"\tRedirect 301 / https://$DOMAIN_NAME/\n" \
 			"</VirtualHost>\n")
 		;;
@@ -186,14 +224,15 @@ then
 	SETTINGS=$(echo -e "$SETTINGS\n" \
 		"<IfModule mod_ssl.c>\n" \
 		"\t<VirtualHost *:$PORT_HTTPS>\n" \
-		"\t\tServerName $DOMAIN_NAME\n" \
-		"$(getAliases "\t\t")\n" \
 		"\t\tServerAdmin $ADMIN_EMAIL\n" \
-		"\t\tDocumentRoot $DOC_ROOT\n" \
-		"$(enableHtaccessIfWanted "\t\t")\n" \
-		"\n\t\tErrorLog \${APACHE_LOG_DIR}/error.log\n" \
+		"\t\tServerName $DOMAIN_NAME" \
+		"$(getAliases "\t\t")" \
+		"$(getDocRootIfWanted "\t\t")" \
+		"$(getCertConf)" \
+		"$(getHttpsProxyConfigIfWanted "\t\t")" \
+		"$(enableHtaccessIfWanted "\t\t")" \
+		"\n\n\t\tErrorLog \${APACHE_LOG_DIR}/error.log\n" \
 		"\t\tCustomLog \${APACHE_LOG_DIR}/access.log combined\n" \
-		"$(getCertConf)\n" \
 		"\t</VirtualHost>\n" \
 		"</IfModule>")
 fi
