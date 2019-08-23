@@ -7,7 +7,7 @@ exitWithError () {
 	then
 		MSG='more attributes needed!'
 	fi
-	printf "\n$SEPARATOR\n\t$MSG\n$SEPARATOR\n\n"
+	echo -e "\n$SEPARATOR\n\t$MSG\n$SEPARATOR\n\n"
 	exit 1
 }
 
@@ -79,7 +79,7 @@ done
 if [ ! -z "$USE_HTTP" ] && [ "$USE_HTTP" == 1 ]
 then
 	read -p 'HTTP Port [80]: ' PORT_HTTP
-	if [ -z "$PORT_HTTP"]
+	if [ -z "$PORT_HTTP" ]
 	then
 		PORT_HTTP=80
 	fi
@@ -88,7 +88,7 @@ fi
 if [ ! -z "$USE_HTTPS" ] && [ "$USE_HTTPS" == 1 ]
 then
 	read -p 'HTTPS Port [443]: ' PORT_HTTPS
-	if [ -z "$PORT_HTTPS"]
+	if [ -z "$PORT_HTTPS" ]
 	then
 		PORT_HTTPS=443
 	fi
@@ -120,6 +120,76 @@ fi
 
 #-------------------------------------------------------------------------------
 #generate vhost settings file
+getAliases () {
+	if [ ! -z "$DOMAIN_ALIASES" ]
+	then
+		aliases=$(echo $DOMAIN_ALIASES | tr ";" "\n")
+		for alias in $aliases
+		do
+			allAliases=$(echo -e "$allAliases ${alias//[[:space:]]/}")
+		done
+		echo -e "\n\t\tServerAlias$allAliases"
+	fi
+}
+getCertConf () {
+	if [ -z "$CUSTOM_SSL_CERTS" ]
+	then
+		CUSTOM_SSL_CERTS_PUBLIC_KEY="/etc/ssl/certs/ssl-cert-snakeoil.pem"
+		CUSTOM_SSL_CERTS_PRIVATE_KEY="/etc/ssl/private/ssl-cert-snakeoil.key"
+	fi
+	echo -e "\n\t\tSSLEngine on\n" \
+ 		"\t\tSSLCertificateFile $CUSTOM_SSL_CERTS_PUBLIC_KEY\n" \
+		"\t\tSSLCertificateKeyFile $CUSTOM_SSL_CERTS_PRIVATE_KEY\n"
+	if [ ! -z "$CUSTOM_SSL_CERTS_CA" ]
+	then
+		echo -e "\t\tSSLCaCertificateFile $CUSTOM_SSL_CERTS_CA\n"
+	fi
+}
+
+SETTINGS=""
+case "$USE_HTTP" in
+	1 )
+		SETTINGS=$(echo -e "$SETTINGS\n" \
+			"<VirtualHost *:$PORT_HTTP>\n" \
+			"\tServerName $DOMAIN_NAME\n" \
+			"$(getAliases)" \
+			"\n\tServerAdmin $ADMIN_EMAIL\n" \
+			"\tDocumentRoot $DOC_ROOT\n" \
+			"\n\tErrorLog \${APACHE_LOG_DIR}/error.log\n" \
+			"\tCustomLog \${APACHE_LOG_DIR}/access.log combined\n" \
+			"</VirtualHost>\n")
+		;;
+	'forward')
+			SETTINGS=$(echo -e "$SETTINGS\n" \
+			"<VirtualHost *:$PORT_HTTP>\n" \
+			"\tServerName $DOMAIN_NAME\n" \
+			"$(getAliases)" \
+			"\n\tRedirect 301 / https://$DOMAIN_NAME/\n" \
+			"</VirtualHost>\n")
+		;;
+esac
+
+if [ ! -z "$USE_HTTPS" ]
+then
+	SETTINGS=$(echo -e "$SETTINGS\n" \
+		"<IfModule mod_ssl.c>\n" \
+		"\t<VirtualHost *:$PORT_HTTPS>\n" \
+		"\t\tServerName $DOMAIN_NAME\n" \
+		"$(getAliases)" \
+		"\n\t\tServerAdmin $ADMIN_EMAIL\n" \
+		"\t\tDocumentRoot $DOC_ROOT\n" \
+		"\n\t\tErrorLog \${APACHE_LOG_DIR}/error.log\n" \
+		"\t\tCustomLog \${APACHE_LOG_DIR}/access.log combined\n" \
+		"$(getCertConf)" \
+		"\n\t</VirtualHost>\n" \
+		"</IfModule>")
+fi
+
+#show config to user
+echo -e "Preview for $DOMAIN_NAME:" \
+"--------------------------------------------------------------------------------"
+"$SETTINGS"
+"--------------------------------------------------------------------------------"
 
 #-------------------------------------------------------------------------------
 #install vhost
@@ -127,7 +197,7 @@ CONFFILE="$DOMAIN_NAME.conf"
 arg1 () {
 	write_file () {
 		#TODO write content to file
-		touch "$VHOSTS_CONFIG_LOCATION/$CONFFILE"
+		echo -e $SETTINGS > "$VHOSTS_CONFIG_LOCATION/$CONFFILE"
 	}
 	ask_new_filename () {
 		read -p 'New name for configuration file: ' CONFFILE
