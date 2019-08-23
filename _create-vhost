@@ -128,7 +128,7 @@ getAliases () {
 		do
 			allAliases=$(echo -e "$allAliases ${alias//[[:space:]]/}")
 		done
-		echo -e "\n\t\tServerAlias$allAliases"
+		echo -e "${1}ServerAlias$allAliases"
 	fi
 }
 getCertConf () {
@@ -146,15 +146,27 @@ getCertConf () {
 	fi
 }
 
+enableHtaccessIfWanted () {
+	if [ ! -z "$ENABLE_HTACCESS" ]
+	then
+		echo -e "\n${1}<Directory $DOC_ROOT>\n" \
+			"${1}\tOptions Indexes FollowSymLinks\n" \
+			"${1}\tAllowOverwrite All\n" \
+			"${1}\tRequire all granted\n" \
+			"${1}</Directory>\n"
+	fi
+}
+
 SETTINGS=""
 case "$USE_HTTP" in
 	1 )
 		SETTINGS=$(echo -e "$SETTINGS\n" \
 			"<VirtualHost *:$PORT_HTTP>\n" \
 			"\tServerName $DOMAIN_NAME\n" \
-			"$(getAliases)" \
-			"\n\tServerAdmin $ADMIN_EMAIL\n" \
+			"$(getAliases "\t")\n" \
+			"\tServerAdmin $ADMIN_EMAIL\n" \
 			"\tDocumentRoot $DOC_ROOT\n" \
+			"$(enableHtaccessIfWanted "\t")\n" \
 			"\n\tErrorLog \${APACHE_LOG_DIR}/error.log\n" \
 			"\tCustomLog \${APACHE_LOG_DIR}/access.log combined\n" \
 			"</VirtualHost>\n")
@@ -163,8 +175,8 @@ case "$USE_HTTP" in
 			SETTINGS=$(echo -e "$SETTINGS\n" \
 			"<VirtualHost *:$PORT_HTTP>\n" \
 			"\tServerName $DOMAIN_NAME\n" \
-			"$(getAliases)" \
-			"\n\tRedirect 301 / https://$DOMAIN_NAME/\n" \
+			"$(getAliases "\t")\n" \
+			"\tRedirect 301 / https://$DOMAIN_NAME/\n" \
 			"</VirtualHost>\n")
 		;;
 esac
@@ -175,13 +187,14 @@ then
 		"<IfModule mod_ssl.c>\n" \
 		"\t<VirtualHost *:$PORT_HTTPS>\n" \
 		"\t\tServerName $DOMAIN_NAME\n" \
-		"$(getAliases)" \
-		"\n\t\tServerAdmin $ADMIN_EMAIL\n" \
+		"$(getAliases "\t\t")\n" \
+		"\t\tServerAdmin $ADMIN_EMAIL\n" \
 		"\t\tDocumentRoot $DOC_ROOT\n" \
+		"$(enableHtaccessIfWanted "\t\t")\n" \
 		"\n\t\tErrorLog \${APACHE_LOG_DIR}/error.log\n" \
 		"\t\tCustomLog \${APACHE_LOG_DIR}/access.log combined\n" \
-		"$(getCertConf)" \
-		"\n\t</VirtualHost>\n" \
+		"$(getCertConf)\n" \
+		"\t</VirtualHost>\n" \
 		"</IfModule>")
 fi
 
