@@ -29,8 +29,8 @@ askUser () {
 }
 
 #-------------------------------------------------------------------------------
-TESTFILE="$VHOSTS_CONFIG_LOCATION/000-default.conf"
-[ -w $TESTFILE ] || exitWithError 'Need write permissions for vhosts!'
+TESTFILE="$VHOSTS_CONFIG_LOCATION/test_write_permissions"
+touch $TESTFILE && rm $TESTFILE || exitWithError 'Need write permissions for vhosts!'
 
 #-------------------------------------------------------------------------------
 #ask user about the wanted configuration
@@ -222,9 +222,9 @@ case "$USE_HTTP" in
 	'forward')
 			SETTINGS=$(echo -e "$SETTINGS\n" \
 			"<VirtualHost *:$PORT_HTTP>\n" \
-			"\tServerName $DOMAIN_NAME\n" \
+			"\tServerName $DOMAIN_NAME" \
 			"$(getAliases "\t")" \
-			"\tRedirect 301 / https://$DOMAIN_NAME/\n" \
+			"\n\tRedirect 301 / https://$DOMAIN_NAME/\n" \
 			"</VirtualHost>\n")
 		;;
 esac
