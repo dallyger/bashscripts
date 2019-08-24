@@ -263,9 +263,9 @@ arg1 () {
 		CONFFILE="$CONFFILE.conf"
 		arg1 #retry writing config with new filename
 	}
-	if [ -s "$CONFFILE" ]
+	if [ -s "$VHOSTS_CONFIG_LOCATION/$CONFFILE" ]
 	then
-		echo "'$DOMAIN_NAME.conf'does already exist."
+		echo "'$DOMAIN_NAME.conf' does already exist."
 		askUser 'Overwrite file?' write_file ask_new_filename
 	else
 		write_file
