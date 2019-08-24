@@ -224,7 +224,7 @@ case "$USE_HTTP" in
 			"<VirtualHost *:$PORT_HTTP>\n" \
 			"\tServerName $DOMAIN_NAME" \
 			"$(getAliases "\t")" \
-			"\n\tRedirect 301 / https://$DOMAIN_NAME/\n" \
+			"\n\tRedirect 301 / https://$DOMAIN_NAME:$PORT_HTTPS/\n" \
 			"</VirtualHost>\n")
 		;;
 esac
