@@ -207,7 +207,7 @@ SETTINGS=""
 
 case "$USE_HTTP" in
 	1 )
-		SETTINGS=$(echo -e "$SETTINGS\n" \
+		SETTINGS=$(echo -e "$SETTINGS" \
 			"<VirtualHost *:$PORT_HTTP>\n" \
 			"\tServerAdmin $ADMIN_EMAIL\n" \
 			"\tServerName $DOMAIN_NAME" \
@@ -220,7 +220,7 @@ case "$USE_HTTP" in
 			"</VirtualHost>\n")
 		;;
 	'forward')
-			SETTINGS=$(echo -e "$SETTINGS\n" \
+			SETTINGS=$(echo -e "$SETTINGS" \
 			"<VirtualHost *:$PORT_HTTP>\n" \
 			"\tServerName $DOMAIN_NAME" \
 			"$(getAliases "\t")" \
@@ -244,7 +244,7 @@ then
 		"\n\n\t\tErrorLog \${APACHE_LOG_DIR}/error.log\n" \
 		"\t\tCustomLog \${APACHE_LOG_DIR}/access.log combined\n" \
 		"\t</VirtualHost>\n" \
-		"</IfModule>")
+		"</IfModule>\n")
 fi
 
 #show config to user
@@ -256,7 +256,7 @@ CONFFILE="$DOMAIN_NAME.conf"
 arg1 () {
 	write_file () {
 		#TODO write content to file
-		echo -e $SETTINGS > "$VHOSTS_CONFIG_LOCATION/$CONFFILE"
+		 printf "$SETTINGS" > "$VHOSTS_CONFIG_LOCATION/$CONFFILE"
 	}
 	ask_new_filename () {
 		read -p 'New name for configuration file: ' CONFFILE
