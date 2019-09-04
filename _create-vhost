@@ -189,7 +189,7 @@ getDirectorySectionIfNeeded () {
 		if [ ! -z "$ENABLE_HTACCESS" ]
 		then
 			echo -e "${1}\tOptions Indexes FollowSymLinks\n" \
-				"${1}\tAllowOverwrite All\n" \
+				"${1}\tAllowOverride All\n" \
 				"${1}\tRequire all granted"
 		fi
 		if [ ! -z "$ENABLE_HTPASSWD" ]
