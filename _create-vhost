@@ -77,7 +77,7 @@ do
 	esac
 done
 
-if [ ! -z "$USE_HTTP" ] && [ "$USE_HTTP" == 1 ]
+if [ ! -z "$USE_HTTP" ]
 then
 	read -p 'HTTP Port [80]: ' PORT_HTTP
 	if [ -z "$PORT_HTTP" ]
