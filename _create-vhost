@@ -1,0 +1,284 @@
+#!/bin/bash
+SEPARATOR='--------------------------------------------------------------------------------'
+VHOSTS_CONFIG_LOCATION="/etc/apache2/sites-available"
+exitWithError () {
+	MSG=${1}
+	if [ -z "$1" ]
+	then
+		MSG='more attributes needed!'
+	fi
+	echo -e "\n$SEPARATOR\n\t$MSG\n$SEPARATOR\n\n"
+	exit 1
+}
+
+# usage: askUser QUESTION ON_YES ON_NO
+askUser () {
+	if [ -z "$3" ]
+	then
+		exitWithError #require all arguments or exit with error
+	fi
+
+	while true; do
+		read -p "${1} [yes/no] " yn
+	    case $yn in
+	        [Yy]* ) ${2}; break;;
+	        [Nn]* ) ${3}; break;;
+	        * ) echo "Please answer yes or no.";;
+	    esac
+	done
+}
+
+#-------------------------------------------------------------------------------
+TESTFILE="$VHOSTS_CONFIG_LOCATION/test_write_permissions"
+touch $TESTFILE && rm $TESTFILE || exitWithError 'Need write permissions for vhosts!'
+
+#-------------------------------------------------------------------------------
+#ask user about the wanted configuration
+arg1 () {
+	IS_PROXY=1
+}
+askUser "Is this a Proxy-VHost?" arg1 break
+
+if [ ! -z "$IS_PROXY" ] && [ "$IS_PROXY" -eq 1 ]
+then
+	read -p "Remote Host: " PROXY_REMOTE_HOST
+	arg1 () {
+		PROXY_IGNORE_SSL=1
+	}
+	askUser "Ignore SSL-Warnings from Proxied Server?" arg1 break
+fi
+
+read -p 'Domain Name: ' DOMAIN_NAME
+read -p 'Domain aliases (separated by semicolons; empty if none): ' DOMAIN_ALIASES
+read -p 'Administration Email: ' ADMIN_EMAIL
+
+if [ -z "$IS_PROXY" ] #only if not a proxy
+then
+	read -p 'Document Root: ' DOC_ROOT
+fi
+
+select type in "HTTP only" "HTTPS only" "both" "forward HTTP to HTTPS"
+do
+	case $type in
+		"HTTP only" )
+			USE_HTTP=1
+			break;;
+		"HTTPS only" )
+			USE_HTTPS=1
+			break;;
+		"both" )
+			USE_HTTP=1
+			USE_HTTPS=1
+			break;;
+		"forward HTTP to HTTPS" )
+			USE_HTTP="forward"
+			USE_HTTPS=1
+			break;;
+	esac
+done
+
+if [ ! -z "$USE_HTTP" ]
+then
+	read -p 'HTTP Port [80]: ' PORT_HTTP
+	if [ -z "$PORT_HTTP" ]
+	then
+		PORT_HTTP=80
+	fi
+fi
+
+if [ ! -z "$USE_HTTPS" ] && [ "$USE_HTTPS" == 1 ]
+then
+	read -p 'HTTPS Port [443]: ' PORT_HTTPS
+	if [ -z "$PORT_HTTPS" ]
+	then
+		PORT_HTTPS=443
+	fi
+fi
+
+arg1 () {
+	CUSTOM_SSL_CERTS=1
+}
+askUser 'Use custom SSL Certificates?' arg1 break
+if [ ! -z "$CUSTOM_SSL_CERTS" ]
+then
+	read -p 'Location of the public key: ' CUSTOM_SSL_CERTS_PUBLIC_KEY
+	read -p 'Location of the private key: ' CUSTOM_SSL_CERTS_PRIVATE_KEY
+	read -p 'Location of the ca cert (optional): ' CUSTOM_SSL_CERTS_CA
+fi
+
+if [ -z "$IS_PROXY" ] #only usefull if not a proxy
+then
+	arg1 () {
+		ENABLE_HTACCESS=1
+	}
+	askUser 'Enable .htaccess files?' arg1 break
+fi
+arg1 () {
+	ENABLE_HTPASSWD=1
+}
+askUser 'Enable authentication via .htpasswd file?' arg1 break
+if [ ! -z "$ENABLE_HTPASSWD" ]
+then
+	read -p 'Location of the .htpasswd file: ' HTPASSWD_FILE
+fi
+
+#-------------------------------------------------------------------------------
+#generate vhost settings file
+getDocRootIfWanted () {
+	if [ -z "$IS_PROXY" ]
+	then
+		echo -e "\n${1}DocumentRoot $DOC_ROOT\n"
+	fi
+}
+
+getAliases () {
+	if [ ! -z "$DOMAIN_ALIASES" ]
+	then
+		aliases=$(echo $DOMAIN_ALIASES | tr ";" "\n")
+		for alias in $aliases
+		do
+			allAliases=$(echo -e "$allAliases ${alias//[[:space:]]/}")
+		done
+		echo -e "\n${1}ServerAlias$allAliases\n"
+	fi
+}
+getCertConf () {
+	if [ -z "$CUSTOM_SSL_CERTS" ]
+	then
+		CUSTOM_SSL_CERTS_PUBLIC_KEY="/etc/ssl/certs/ssl-cert-snakeoil.pem"
+		CUSTOM_SSL_CERTS_PRIVATE_KEY="/etc/ssl/private/ssl-cert-snakeoil.key"
+	fi
+	echo -e "\n\n\t\tSSLEngine on\n" \
+ 		"\t\tSSLCertificateFile $CUSTOM_SSL_CERTS_PUBLIC_KEY\n" \
+		"\t\tSSLCertificateKeyFile $CUSTOM_SSL_CERTS_PRIVATE_KEY\n"
+	if [ ! -z "$CUSTOM_SSL_CERTS_CA" ]
+	then
+		echo -e "\t\tSSLCaCertificateFile $CUSTOM_SSL_CERTS_CA\n"
+	fi
+}
+
+getHttpProxyConfigIfWanted () {
+	if [ ! -z "$IS_PROXY" ]
+	then
+		echo -e "\n\n${1}ProxyPreserveHost On\n" \
+			"${1}ProxyPass /  http://$PROXY_REMOTE_HOST/\n" \
+			"${1}ProxyPassReverse /  http://$PROXY_REMOTE_HOST/\n"
+	fi
+}
+
+getHttpsProxyConfigIfWanted () {
+	if [ ! -z "$IS_PROXY" ]
+	then
+		echo -e "\n\n${1}SSLProxyEngine On\n" \
+			"${1}ProxyPass /  https://$PROXY_REMOTE_HOST/\n" \
+			"${1}ProxyPassReverse /  https://$PROXY_REMOTE_HOST/"
+		if [ ! -z "$PROXY_IGNORE_SSL" ]
+		then
+			echo -e "${1}SSLProxyVerify none\n" \
+			"${1}SSLProxyCheckPeerName off\n" \
+			"${1}SSLProxyCheckPeerCN off\n" \
+			"${1}SSLProxyCheckPeerExpire off\n"
+		fi
+	fi
+}
+
+getDirectorySectionIfNeeded () {
+	if [ ! -z "$ENABLE_HTACCESS" ] || [ ! -z "$ENABLE_HTPASSWD" ]
+	then
+		echo -e "\n\n${1}<Directory $DOC_ROOT>"
+		if [ ! -z "$ENABLE_HTACCESS" ]
+		then
+			echo -e "${1}\tOptions Indexes FollowSymLinks\n" \
+				"${1}\tAllowOverride All\n" \
+				"${1}\tRequire all granted"
+		fi
+		if [ ! -z "$ENABLE_HTPASSWD" ]
+		then
+			echo -e "${1}\tAuthName 'Login required'\n" \
+				"${1}\tAuthType Basic\n" \
+				"${1}\tAuthUserFile $HTPASSWD_FILE\n" \
+				"${1}\tRequire valid-user"
+		fi
+		echo -e "${1}</Directory>\n"
+	fi
+}
+
+SETTINGS=""
+
+case "$USE_HTTP" in
+	1 )
+		SETTINGS=$(echo -e "$SETTINGS" \
+			"<VirtualHost *:$PORT_HTTP>\n" \
+			"\tServerAdmin $ADMIN_EMAIL\n" \
+			"\tServerName $DOMAIN_NAME" \
+			"$(getAliases "\t")" \
+			"$(getDocRootIfWanted "\t")" \
+			"$(getHttpProxyConfigIfWanted "\t")" \
+			"$(getDirectorySectionIfNeeded "\t")" \
+			"\n\n\tErrorLog \${APACHE_LOG_DIR}/error.log\n" \
+			"\tCustomLog \${APACHE_LOG_DIR}/access.log combined\n" \
+			"</VirtualHost>\n")
+		;;
+	'forward')
+			SETTINGS=$(echo -e "$SETTINGS" \
+			"<VirtualHost *:$PORT_HTTP>\n" \
+			"\tServerName $DOMAIN_NAME" \
+			"$(getAliases "\t")" \
+			"\n\tRedirect 301 / https://$DOMAIN_NAME:$PORT_HTTPS/\n" \
+			"</VirtualHost>\n")
+		;;
+esac
+
+if [ ! -z "$USE_HTTPS" ]
+then
+	SETTINGS=$(echo -e "$SETTINGS\n" \
+		"<IfModule mod_ssl.c>\n" \
+		"\t<VirtualHost *:$PORT_HTTPS>\n" \
+		"\t\tServerAdmin $ADMIN_EMAIL\n" \
+		"\t\tServerName $DOMAIN_NAME" \
+		"$(getAliases "\t\t")" \
+		"$(getDocRootIfWanted "\t\t")" \
+		"$(getCertConf)" \
+		"$(getHttpsProxyConfigIfWanted "\t\t")" \
+		"$(getDirectorySectionIfNeeded "\t\t")" \
+		"\n\n\t\tErrorLog \${APACHE_LOG_DIR}/error.log\n" \
+		"\t\tCustomLog \${APACHE_LOG_DIR}/access.log combined\n" \
+		"\t</VirtualHost>\n" \
+		"</IfModule>\n")
+fi
+
+#show config to user
+echo -e "Preview for $DOMAIN_NAME:\n$SEPARATOR\n$SETTINGS\n$SEPARATOR"
+
+#-------------------------------------------------------------------------------
+#install vhost
+CONFFILE="$DOMAIN_NAME.conf"
+arg1 () {
+	write_file () {
+		#TODO write content to file
+		 printf "$SETTINGS" > "$VHOSTS_CONFIG_LOCATION/$CONFFILE"
+	}
+	ask_new_filename () {
+		read -p 'New name for configuration file: ' CONFFILE
+		CONFFILE="$CONFFILE.conf"
+		arg1 #retry writing config with new filename
+	}
+	if [ -s "$VHOSTS_CONFIG_LOCATION/$CONFFILE" ]
+	then
+		echo "'$DOMAIN_NAME.conf' does already exist."
+		askUser 'Overwrite file?' write_file ask_new_filename
+	else
+		write_file
+	fi
+}
+askUser "Save configuration?" arg1 exit
+
+arg1 () {
+	a2ensite "$CONFFILE" > /dev/null
+}
+askUser "enable new virtual host?" arg1 exit
+
+arg1 () {
+	systemctl restart apache2.service
+}
+askUser "restart webserver to activate virtual host now?" arg1 exit

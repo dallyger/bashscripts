@@ -8,6 +8,6 @@ elif [ $UID -ne 0 ]; then
 	#restart and ask for sudo rigths
 	exec sudo $0 $@
 else
-	echo "Error: Can't create commands, even with root permissions..."
+	echo "Error: Can't remove commands, even with root permissions..."
 	exit 1
 fi
