@@ -1,6 +1,6 @@
 #!/bin/bash
 
-NANO_OPTIONS="--tabsize=4 --constantshow --autoindent --linenumbers"
+NANO_OPTIONS="--tabsize=4 --constantshow --autoindent --linenumbers --mouse"
 NANO_CMD="nano $NANO_OPTIONS"
 
 FILE="$1"
