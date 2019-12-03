@@ -6,8 +6,13 @@ if [ $# -ge 2 ]
 then
 	screen -dm bash -c "sleep ${2}; ${0} \"${1}\""
 else
+	if [ $# -eq 0 ]; then
+		read MSG
+	else
+		MSG="${1}"
+	fi
 	curl --silent --request GET \
 		--url "https://api.telegram.org/bot$BOT_KEY/sendMessage" \
 		--data-urlencode "chat_id=$CHAT_ID" \
-		--data-urlencode "text=${1}" > /dev/null
+		--data-urlencode "text=$MSG" > /dev/null
 fi
