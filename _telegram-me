@@ -4,7 +4,7 @@ source ~/.config/darlor/telegram-config
 
 if [ $# -ge 2 ]
 then
-	screen -dm bash -c "sleep ${2}; ${0} \"${1}\""
+	screen -dmS sheduled-telegram-msg bash -c "sleep ${2}; ${0} \"${1}\""
 else
 	if [ $# -eq 0 ]; then
 		read MSG
