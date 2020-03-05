@@ -1,0 +1,8 @@
+#!/bin/bash
+
+if [ $# -eq 1 ]; then
+	while [ 1 ]; do tail -f -n 0 ${1} | _telegram-me; done
+else
+	echo 'please specify the file to track';
+	exit 1;
+fi
