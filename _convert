@@ -37,4 +37,4 @@ FILENAME=${TITLE// /_}
 FILENAME=${FILENAME,,}
 
 #converting the file
-ffmpeg -hwaccel auto -hide_banner -i "${1}" -map 0 -codec copy -codec:v h264 -codec:a ac3 -metadata title="$TITLE" "$NEWPATH/$FILENAME.mkv"
+ffmpeg -vsync 0 -hwaccel auto -hide_banner -i "${1}" -map 0 -codec copy -codec:v hevc -codec:a ac3 -metadata title="$TITLE" "$NEWPATH/$FILENAME.mkv"
