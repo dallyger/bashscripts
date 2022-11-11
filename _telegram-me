@@ -15,5 +15,5 @@ $LINE"; done
 	curl --silent --request GET \
 		--url "https://api.telegram.org/bot$BOT_KEY/sendMessage" \
 		--data-urlencode "chat_id=$CHAT_ID" \
-		--data-urlencode "text=${MSG:1:4096}" > /dev/null
+		--data-urlencode "text=${MSG:0:4096}" > /dev/null
 fi
